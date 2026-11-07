@@ -127,7 +127,7 @@ export async function GET(request: Request): Promise<Response> {
     });
   }
 
-  const key = process.env.NTA_API_KEY;
+  const key = process.env.NTA_KEY;
   if (!key) return fallback();
 
   const ctrl = new AbortController();

@@ -48,7 +48,7 @@ function mockUpstream(handler: (url: string, init?: RequestInit) => Promise<Resp
 }
 
 beforeEach(() => {
-  vi.stubEnv("NTA_API_KEY", "test-key");
+  vi.stubEnv("NTA_KEY", "test-key");
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => {
@@ -111,7 +111,7 @@ describe("GET /api/realtime", () => {
   });
 
   it("503 fallback when the key is missing", async () => {
-    vi.stubEnv("NTA_API_KEY", "");
+    vi.stubEnv("NTA_KEY", "");
     const fetchFn = mockUpstream(async () => ok({}));
     const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(503);
