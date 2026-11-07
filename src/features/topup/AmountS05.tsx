@@ -17,8 +17,9 @@ export function AmountS05() {
   const navigate = useNavigate();
   const card = useCardStore((s) => s.card);
   const { amountCents, setAmount } = useTopUpStore();
-  const [custom, setCustom] = useState("");
-  const [customOn, setCustomOn] = useState(false);
+  const isChip = (CONFIG.amountChipsCents as readonly number[]).includes(amountCents);
+  const [custom, setCustom] = useState(isChip ? "" : (amountCents / 100).toFixed(2));
+  const [customOn, setCustomOn] = useState(!isChip);
   if (!card) return <Navigate to="/" replace />;
 
   const amount = customOn ? parseEuroToCents(custom) : amountCents;
