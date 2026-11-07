@@ -27,6 +27,15 @@ export const router = createBrowserRouter([
       { path: "topup/processing", element: <ProcessingS10 /> },
       { path: "topup/success", element: <SuccessS11 /> },
       {
+        path: "plan",
+        lazy: async () => ({ Component: (await import("../features/plan/PlanS16")).PlanS16 }),
+      },
+      {
+        path: "plan/:idx",
+        hydrateFallbackElement: <p className="p-6 text-sm text-ink-muted">Loading map…</p>,
+        lazy: async () => ({ Component: (await import("../features/plan/JourneyS17")).JourneyS17 }),
+      },
+      {
         path: "live",
         hydrateFallbackElement: <p className="p-6 text-sm text-ink-muted">Loading live map…</p>,
         lazy: async () => ({ Component: (await import("../features/live/RouteMapS13")).RouteMapS13 }),

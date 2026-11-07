@@ -3,12 +3,13 @@ import { NavLink } from "react-router-dom";
 const TABS = [
   { to: "/", label: "Card", end: true },
   { to: "/topup", label: "Top Up", end: false },
+  { to: "/plan", label: "Plan", end: false },
   { to: "/live", label: "Live", end: false },
 ] as const;
 
 export function TabBar() {
   return (
-    <nav aria-label="Main" className="grid grid-cols-3 border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)]">
+    <nav aria-label="Main" className="grid grid-cols-4 border-t border-neutral-200 bg-white pb-[env(safe-area-inset-bottom)]">
       {TABS.map((t) => (
         <NavLink
           key={t.to}
