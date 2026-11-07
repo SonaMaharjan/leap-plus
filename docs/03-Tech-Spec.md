@@ -46,7 +46,7 @@ Static route data (shapes, stops, today's timetable) is pre-extracted from the p
 │ /api/card/topup   POST {cardNumber, amountCents, method, idempotencyKey}│
 │   • validates input • adds SHEET_SHARED_SECRET • 8 s timeout           │
 │ /api/realtime     GET ?routes=…                                        │
-│   • adds NTA_API_KEY • filters routes • Cache-Control s-maxage=20      │
+│   • adds NTA_KEY • filters routes • Cache-Control s-maxage=20          │
 │   • on NTA error → 503 {fallback:true} → client switches to RECORDED   │
 └───────┬───────────────────────────────────────────┬────────────────────┘
         │ HTTPS + shared secret                     │ HTTPS + API key header
@@ -250,7 +250,7 @@ Flowchart gaps: none block the build. 2 optional additions to the drawing: (1) D
 
 ## 9. Security design (input to Security Review)
 
-- Secrets only in Vercel env vars: `NTA_API_KEY`, `SHEET_WEBAPP_URL`, `SHEET_SHARED_SECRET`. Never prefixed `VITE_` (Vite exposes `VITE_*` vars to the browser).
+- Secrets only in Vercel env vars: `NTA_KEY`, `SHEET_WEBAPP_URL`, `SHEET_SHARED_SECRET`. Never prefixed `VITE_` (Vite exposes `VITE_*` vars to the browser).
 - Google Pay token: never stored, logged, or sent. TEST mode only.
 - No real personal data. Fake card numbers only.
 - Server-side validation of all inputs (regex, integer cents, ranges, method enum, UUID).

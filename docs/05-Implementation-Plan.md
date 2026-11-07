@@ -60,7 +60,7 @@ Est = Devin wall-clock minutes. "Accept" = what PO/OPS checks on the preview.
 
 | ID | Task | Est | Accept | Ref |
 |---|---|---|---|---|
-| D2-1 | `api/realtime.ts`: allowlist + sort routes, Vehicles + TripUpdates in parallel, 5 s timeout, map route_id → short name, `RealtimeRes`, cache header, 503 `{fallback:true}`. OPS sets `NTA_API_KEY`. | 30 | `?routes=99X` → 400; no key → 503; with key → vehicles JSON | TS 7.2, SR F6, F7 |
+| D2-1 | `api/realtime.ts`: allowlist + sort routes, Vehicles + TripUpdates in parallel, 5 s timeout, map route_id → short name, `RealtimeRes`, cache header, 503 `{fallback:true}`. OPS sets `NTA_KEY`. | 30 | `?routes=99X` → 400; no key → 503; with key → vehicles JSON | TS 7.2, SR F6, F7 |
 | D2-2 | `useRealtime`: LIVE poll 20 s; RECORDED loop; auto-fallback on 503/network (entry **and** later polls) + toast; retry LIVE every 60 s; `?liveFail=1`; badge "LIVE · Ns ago" / "RECORDED · hh:mm". | 25 | Wi-Fi off → RECORDED + toast; Wi-Fi on → LIVE within 60 s | TS 7.4, 8 |
 | D2-3 | S13 map (react-leaflet, OSM attribution, route chips E1/39A/16, route line, bus markers, empty state), S14 stop list sheet. | 35 | Buses visible on all 3 routes in RECORDED | PF S13, S14 |
 | D2-4 | `eta.ts` + tests (next 3, Live vs Scheduled tag). S15 stop detail: arrivals, fare row "Fare €2.00 · Balance €x". | 25 | ETAs plausible vs TFI Journey Planner for 1 stop | TS 7.3 |

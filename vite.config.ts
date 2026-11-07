@@ -42,7 +42,7 @@ function apiDev(): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  for (const k of ["NTA_API_KEY", "SHEET_WEBAPP_URL", "SHEET_SHARED_SECRET"]) if (env[k]) process.env[k] = env[k];
+  for (const k of ["NTA_KEY", "SHEET_WEBAPP_URL", "SHEET_SHARED_SECRET"]) if (env[k]) process.env[k] = env[k];
   if (mode === "development" && !process.env.SHEET_WEBAPP_URL) {
     process.env.SHEET_WEBAPP_URL = "mock";
     process.env.SHEET_SHARED_SECRET = "mock";

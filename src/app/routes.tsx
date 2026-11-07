@@ -10,7 +10,6 @@ import { MethodS06 } from "../features/topup/MethodS06";
 import { ProcessingS10 } from "../features/topup/ProcessingS10";
 import { SuccessS11 } from "../features/topup/SuccessS11";
 import { App } from "./App";
-import { Placeholder } from "./Placeholder";
 
 export const router = createBrowserRouter([
   {
@@ -27,7 +26,18 @@ export const router = createBrowserRouter([
       { path: "topup/confirm", element: <ConfirmS07 /> },
       { path: "topup/processing", element: <ProcessingS10 /> },
       { path: "topup/success", element: <SuccessS11 /> },
-      { path: "live", element: <Placeholder screen="S13" title="Live" /> },
+      {
+        path: "live",
+        hydrateFallbackElement: <p className="p-6 text-sm text-ink-muted">Loading live map…</p>,
+        lazy: async () => ({ Component: (await import("../features/live/RouteMapS13")).RouteMapS13 }),
+        children: [
+          { index: true, lazy: async () => ({ Component: (await import("../features/live/StopListS14")).StopListS14 }) },
+          {
+            path: "stop/:stopId",
+            lazy: async () => ({ Component: (await import("../features/live/StopDetailS15")).StopDetailS15 }),
+          },
+        ],
+      },
     ],
   },
 ]);
