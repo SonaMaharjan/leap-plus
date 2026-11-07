@@ -62,12 +62,13 @@ describe("parseRoutes (F7 allowlist)", () => {
   it("defaults to all routes, sorted", () => expect(parseRoutes(null)).toEqual(["16", "39A", "E1"]));
   it("sorts and dedupes", () => expect(parseRoutes("e1,16,E1")).toEqual(["16", "E1"]));
   it("rejects unknown routes", () => expect(parseRoutes("E1,99X")).toBeNull());
+  it("accepts repeated valid routes", () => expect(parseRoutes("E1,E1,E1,16")).toEqual(["16", "E1"]));
 });
 
 describe("GET /api/realtime", () => {
   it("returns filtered vehicles and trip delays with a shared cache header", async () => {
     const fetchFn = mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
-    const res = await GET(req("?routes=E1,39A,16"));
+    const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(200);
     expect(res.headers.get("Cache-Control")).toContain("s-maxage=20");
     const body = await res.json();
@@ -90,6 +91,18 @@ describe("GET /api/realtime", () => {
     expect(body.tripDelays).toEqual({});
   });
 
+  it("redirects non-canonical route lists to one cache key", async () => {
+    const fetchFn = mockUpstream(async () => ok({}));
+    for (const qs of ["?routes=E1,16", "?routes=e1,16,E1", "?routes=16,E1&x=1"]) {
+      const res = await GET(req(qs));
+      expect(res.status).toBe(308);
+      expect(res.headers.get("Location")).toBe("/api/realtime?routes=16,E1");
+    }
+    const all = await GET(req());
+    expect(all.headers.get("Location")).toBe("/api/realtime?routes=16,39A,E1");
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it("400 on a non-allowlisted route, without calling upstream", async () => {
     const fetchFn = mockUpstream(async () => ok({}));
     const res = await GET(req("?routes=99X"));
@@ -100,7 +113,7 @@ describe("GET /api/realtime", () => {
   it("503 fallback when the key is missing", async () => {
     vi.stubEnv("NTA_API_KEY", "");
     const fetchFn = mockUpstream(async () => ok({}));
-    const res = await GET(req());
+    const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ fallback: true });
     expect(fetchFn).not.toHaveBeenCalled();
@@ -108,7 +121,7 @@ describe("GET /api/realtime", () => {
 
   it("503 fallback on upstream error, without echoing the upstream body", async () => {
     mockUpstream(async () => new Response("secret upstream detail", { status: 401 }));
-    const res = await GET(req());
+    const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(503);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
     expect(await res.text()).toBe('{"fallback":true}');
@@ -116,7 +129,7 @@ describe("GET /api/realtime", () => {
 
   it("still serves vehicles when only TripUpdates fails", async () => {
     mockUpstream(async (url) => (url.includes("Vehicles") ? ok(vehiclesFeed) : new Response("", { status: 500 })));
-    const res = await GET(req());
+    const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(200);
     expect((await res.json()).tripDelays).toEqual({});
   });
@@ -129,7 +142,7 @@ describe("GET /api/realtime", () => {
           init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
         }),
     );
-    const pending = GET(req());
+    const pending = GET(req("?routes=16,39A,E1"));
     await vi.advanceTimersByTimeAsync(UPSTREAM_TIMEOUT_MS + 10);
     const res = await pending;
     expect(res.status).toBe(503);

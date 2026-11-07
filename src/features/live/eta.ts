@@ -9,6 +9,7 @@ export type Arrival = {
 };
 
 const TZ = "Europe/Dublin";
+const DAY = 86_400;
 
 /** Seconds since local midnight in Dublin (GTFS service-day clock). */
 export function dublinSecondsNow(now: Date = new Date()): number {
@@ -41,7 +42,9 @@ export function nextArrivals(
     const scheduledSecs = trip.startSecs + offset;
     const d = tripDelays[trip.tripId];
     const delaySecs = d ? d.delaySecs : 0;
-    const etaSecs = scheduledSecs + delaySecs;
+    let etaSecs = scheduledSecs + delaySecs;
+    // After midnight, the previous service day's late trips (GTFS times ≥ 24:00) are still upcoming.
+    if (etaSecs >= DAY && nowSecs < DAY / 2 && etaSecs - DAY >= nowSecs) etaSecs -= DAY;
     if (etaSecs < nowSecs) continue;
     out.push({ tripId: trip.tripId, scheduledSecs, etaSecs, delaySecs, live: Boolean(d) });
   }
