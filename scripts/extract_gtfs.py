@@ -153,8 +153,14 @@ def main():
         trips_n = sum(len(d["timetable"]) for d in directions)
         print(f"{short}: {len(directions)} directions, {trips_n} trips, {os.path.getsize(path) // 1024} KB")
 
-    with open(os.path.join(args.out, "routes.json"), "w") as fh:
-        json.dump({rid: lookup[rid] for rid in by_short.values()}, fh, indent=1)
+    lookup_path = os.path.join(args.out, "routes.json")
+    merged = {}
+    if os.path.exists(lookup_path):
+        with open(lookup_path) as fh:
+            merged = {rid: name for rid, name in json.load(fh).items() if name not in wanted}
+    merged.update({rid: lookup[rid] for rid in by_short.values()})
+    with open(lookup_path, "w") as fh:
+        json.dump(dict(sorted(merged.items())), fh, indent=1)
 
 
 if __name__ == "__main__":

@@ -51,6 +51,9 @@ def main():
     routes = [json.load(open(p)) for p in sorted(glob.glob(os.path.join(ROOT, "gtfs", "*.json"))) if not p.endswith("routes.json")]
     if not routes:
         raise SystemExit("Run scripts/extract_gtfs.py first")
+    dates = {r["serviceDate"] for r in routes}
+    if len(dates) > 1:
+        raise SystemExit(f"Route files have mixed service dates {sorted(dates)}; re-run extract_gtfs.py for all routes")
     service_date = dt.datetime.strptime(routes[0]["serviceDate"], "%Y%m%d").replace(tzinfo=ZoneInfo("Europe/Dublin"))
     h, m = (int(x) for x in args.start.split(":"))
     start_secs = h * 3600 + m * 60
