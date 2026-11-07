@@ -118,15 +118,6 @@ export async function GET(request: Request): Promise<Response> {
   const url = new URL(request.url);
   const routes = parseRoutes(url.searchParams.get("routes"));
   if (!routes) return json(400, { error: "INVALID_ROUTE" }, "no-store");
-  // F7: one cache key per route set — redirect order/case/extra-param variants to the canonical URL.
-  const canonical = `?routes=${routes.join(",")}`;
-  if (url.search !== canonical) {
-    return new Response(null, {
-      status: 308,
-      headers: { Location: `${url.pathname}${canonical}`, "Cache-Control": "public, s-maxage=3600" },
-    });
-  }
-
   const key = process.env.NTA_KEY;
   if (!key) return fallback();
 
