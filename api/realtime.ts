@@ -29,7 +29,9 @@ export const ALLOWED_ROUTES = Object.values(ROUTE_IDS);
 
 const NTA_BASE = "https://api.nationaltransport.ie/gtfsr/v2";
 export const UPSTREAM_TIMEOUT_MS = 8000;
-const CACHE_OK = "public, s-maxage=20, stale-while-revalidate=40";
+const CACHE_OK = "public, s-maxage=30, stale-while-revalidate=60";
+/** On NTA failure (e.g. 429 rate limit) keep serving the last good LIVE data this long. */
+export const STALE_OK_MS = 120_000;
 
 /** Returns the sorted, deduped route list, or null if any value is not allowlisted. Empty → all routes. */
 export function parseRoutes(raw: string | null): string[] | null {
@@ -96,11 +98,19 @@ export function mapTripDelays(feed: Feed, routes: string[]): RealtimeRes["tripDe
   return out;
 }
 
+class RateLimited extends Error {
+  name = "RateLimited";
+  constructor(readonly retryAfterSecs: number) {
+    super("NTA rate limited");
+  }
+}
+
 async function fetchFeed(path: string, key: string, signal: AbortSignal): Promise<Feed> {
   const res = await fetch(`${NTA_BASE}/${path}?format=json`, {
     headers: { "x-api-key": key, Accept: "application/json" },
     signal,
   });
+  if (res.status === 429) throw new RateLimited(Number(res.headers.get("Retry-After")) || 30);
   if (!res.ok) throw new Error(`upstream ${path} ${res.status}`);
   return (await res.json()) as Feed;
 }
@@ -114,12 +124,20 @@ function json(status: number, body: unknown, cache: string): Response {
 
 const fallback = () => json(503, { fallback: true }, "no-store");
 
-// Per-instance cache (incl. in-flight fetches) so query-string variants cannot bypass the CDN and burn NTA quota.
-const CACHE_TTL_MS = 20_000;
-const memo = new Map<string, { at: number; p: Promise<RealtimeRes> }>();
-export const clearRealtimeCache = () => memo.clear();
+// One upstream load per instance for all routes (incl. in-flight), filtered per request, so query variants
+// cannot multiply NTA calls. NTA rate-limits keys (429 + Retry-After), so we back off and serve last good data.
+const CACHE_TTL_MS = 30_000;
+type Snapshot = { fetchedAt: string; vehicles: RealtimeVehicle[]; delaysByRoute: Record<string, RealtimeRes["tripDelays"]> };
+let memo: { at: number; p: Promise<Snapshot> } | null = null;
+let lastGood: Snapshot | null = null;
+let backoffUntil = 0;
+export const clearRealtimeCache = () => {
+  memo = null;
+  lastGood = null;
+  backoffUntil = 0;
+};
 
-async function load(routes: string[], key: string): Promise<RealtimeRes> {
+async function load(key: string): Promise<Snapshot> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), UPSTREAM_TIMEOUT_MS);
   try {
@@ -128,16 +146,34 @@ async function load(routes: string[], key: string): Promise<RealtimeRes> {
       fetchFeed("Vehicles", key, ctrl.signal),
       fetchFeed("TripUpdates", key, ctrl.signal),
     ]);
+    for (const r of [vehicles, trips]) {
+      if (r.status === "rejected" && r.reason instanceof RateLimited) {
+        backoffUntil = Date.now() + r.reason.retryAfterSecs * 1000;
+      }
+    }
     if (vehicles.status === "rejected") throw vehicles.reason;
-    return {
-      source: "LIVE",
+    const res: Snapshot = {
       fetchedAt: new Date().toISOString(),
-      vehicles: mapVehicles(vehicles.value, routes),
-      tripDelays: trips.status === "fulfilled" ? mapTripDelays(trips.value, routes) : {},
+      vehicles: mapVehicles(vehicles.value, ALLOWED_ROUTES),
+      delaysByRoute:
+        trips.status === "fulfilled"
+          ? Object.fromEntries(ALLOWED_ROUTES.map((r) => [r, mapTripDelays(trips.value, [r])]))
+          : (lastGood?.delaysByRoute ?? {}),
     };
+    lastGood = res;
+    return res;
   } finally {
     clearTimeout(timer);
   }
+}
+
+function forRoutes(snap: Snapshot, routes: string[]): RealtimeRes {
+  return {
+    source: "LIVE",
+    fetchedAt: snap.fetchedAt,
+    vehicles: snap.vehicles.filter((v) => routes.includes(v.route)),
+    tripDelays: Object.assign({}, ...routes.map((r) => snap.delaysByRoute[r] ?? {})),
+  };
 }
 
 export async function GET(request: Request): Promise<Response> {
@@ -146,21 +182,24 @@ export async function GET(request: Request): Promise<Response> {
   if (!routes) return json(400, { error: "INVALID_ROUTE" }, "no-store");
   const key = process.env.NTA_KEY;
   if (!key) return fallback();
-  const cacheKey = routes.join(",");
-  let entry = memo.get(cacheKey);
-  if (!entry || Date.now() - entry.at >= CACHE_TTL_MS) {
-    const p = load(routes, key);
-    const fresh = { at: Date.now(), p };
-    entry = fresh;
-    memo.set(cacheKey, fresh);
-    p.catch(() => memo.get(cacheKey) === fresh && memo.delete(cacheKey));
+  const now = Date.now();
+  const staleOk = () => (lastGood && now - Date.parse(lastGood.fetchedAt) < STALE_OK_MS ? lastGood : null);
+  if ((!memo || now - memo.at >= CACHE_TTL_MS) && now < backoffUntil) {
+    const stale = staleOk();
+    return stale ? json(200, forRoutes(stale, routes), "no-store") : fallback();
+  }
+  if (!memo || now - memo.at >= CACHE_TTL_MS) {
+    const fresh = { at: now, p: load(key) };
+    memo = fresh;
+    fresh.p.catch(() => memo === fresh && (memo = null));
   }
   try {
-    return json(200, await entry.p, CACHE_OK);
+    return json(200, forRoutes(await memo.p, routes), CACHE_OK);
   } catch (err) {
     // F10: generic body to the client; F6: never log headers or the key.
     const reqId = Math.random().toString(36).slice(2, 10);
     console.error(`[realtime ${reqId}] upstream failure: ${err instanceof Error ? err.name : "unknown"}`);
-    return fallback();
+    const stale = staleOk();
+    return stale ? json(200, forRoutes(stale, routes), "no-store") : fallback();
   }
 }

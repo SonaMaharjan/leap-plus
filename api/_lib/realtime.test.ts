@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GET, ROUTE_IDS, UPSTREAM_TIMEOUT_MS, clearRealtimeCache, parseRoutes } from "../realtime";
+import { GET, ROUTE_IDS, STALE_OK_MS, UPSTREAM_TIMEOUT_MS, clearRealtimeCache, parseRoutes } from "../realtime";
 
 const vehiclesFeed = {
   header: { timestamp: "1794060000" },
@@ -71,7 +71,7 @@ describe("GET /api/realtime", () => {
     const fetchFn = mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
     const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=20");
+    expect(res.headers.get("Cache-Control")).toContain("s-maxage=30");
     const body = await res.json();
     expect(body.source).toBe("LIVE");
     expect(body.vehicles).toEqual([
@@ -158,6 +158,42 @@ describe("GET /api/realtime", () => {
     const res = await pending;
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ fallback: true });
+  });
+});
+
+describe("NTA rate limit (429)", () => {
+  const limited = () => new Response('{"statusCode":429}', { status: 429, headers: { "Retry-After": "27" } });
+
+  it("serves the last good LIVE data and backs off until Retry-After", async () => {
+    vi.useFakeTimers();
+    let rateLimited = false;
+    const fetchFn = mockUpstream(async (url) =>
+      rateLimited ? limited() : ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed),
+    );
+    expect((await GET(req())).status).toBe(200);
+    rateLimited = true;
+    await vi.advanceTimersByTimeAsync(31_000);
+    const res = await GET(req("?routes=E1"));
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    const body = await res.json();
+    expect(body.source).toBe("LIVE");
+    expect(body.vehicles.map((v: { route: string }) => v.route)).toEqual(["E1"]);
+    expect(body.tripDelays).toEqual({ "6016_1": { delaySecs: 180, stopSeq: 6 } });
+    const calls = fetchFn.mock.calls.length;
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect((await GET(req())).status).toBe(200);
+    expect(fetchFn.mock.calls.length).toBe(calls);
+  });
+
+  it("falls back to 503 once the last good data is too old", async () => {
+    vi.useFakeTimers();
+    let rateLimited = false;
+    mockUpstream(async (url) => (rateLimited ? limited() : ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed)));
+    expect((await GET(req())).status).toBe(200);
+    rateLimited = true;
+    await vi.advanceTimersByTimeAsync(STALE_OK_MS + 1000);
+    expect((await GET(req())).status).toBe(503);
   });
 });
 
