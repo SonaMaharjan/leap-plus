@@ -10,7 +10,7 @@ import { LiveBadge } from "../live/LiveBadge";
 import { useRealtime } from "../live/useRealtime";
 import { LegChips } from "./LegChips";
 import { hhmm, isTransit, liveStatus, mins, modeColor, modeLabel, type JourneyLeg } from "./planApi";
-import { PLAN_MAX_AGE_MS, usePlanStore } from "./planStore";
+import { usePlanStore } from "./planStore";
 import { decodePolyline } from "./polyline";
 
 const LIVE_ROUTES: readonly string[] = CONFIG.routes;
@@ -30,7 +30,6 @@ export function JourneyS17() {
   const { idx } = useParams();
   const navigate = useNavigate();
   const it = usePlanStore((s) => s.itineraries?.[Number(idx)]);
-  const stale = usePlanStore((s) => !s.plannedAt || Date.now() - s.plannedAt > PLAN_MAX_AGE_MS);
   const rt = useRealtime();
 
   const legs = useMemo(
@@ -51,7 +50,7 @@ export function JourneyS17() {
   const myBuses = vehicles.filter((v) => myTrips.has(v.tripId));
   const shown = myBuses.length ? myBuses : vehicles;
 
-  if (!it || stale) return <Navigate to="/plan" replace />;
+  if (!it) return <Navigate to="/plan" replace />;
   const first = legs[0]?.leg.from;
   const last = legs[legs.length - 1]?.leg.to;
 

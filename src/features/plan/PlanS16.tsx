@@ -27,13 +27,17 @@ const SORTS: { id: Sort; label: string }[] = [
 
 /** S16 Journey planner: from/to search and route comparison. */
 export function PlanS16() {
-  const { from, to, itineraries, plannedAt, status, setFrom, setTo, swap, plan } = usePlanStore();
+  const { from, to, itineraries, status, setFrom, setTo, swap, plan } = usePlanStore();
   const [sort, setSort] = useState<Sort>("fastest");
 
   useEffect(() => {
-    if (itineraries && status !== "loading" && (!plannedAt || Date.now() - plannedAt > PLAN_MAX_AGE_MS)) void plan();
-    // Re-plan stale results once on entry only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const refreshIfStale = () => {
+      const s = usePlanStore.getState();
+      if (s.itineraries && s.status !== "loading" && (!s.plannedAt || Date.now() - s.plannedAt > PLAN_MAX_AGE_MS)) void s.plan();
+    };
+    refreshIfStale();
+    const id = setInterval(refreshIfStale, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   const sorted = useMemo(() => {
