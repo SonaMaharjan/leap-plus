@@ -71,7 +71,7 @@ describe("GET /api/realtime", () => {
     const fetchFn = mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
     const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=30");
+    expect(res.headers.get("Cache-Control")).toContain("s-maxage=60");
     const body = await res.json();
     expect(body.source).toBe("LIVE");
     expect(body.vehicles).toEqual([
@@ -172,10 +172,10 @@ describe("NTA rate limit (429)", () => {
     );
     expect((await GET(req())).status).toBe(200);
     rateLimited = true;
-    await vi.advanceTimersByTimeAsync(31_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     const res = await GET(req("?routes=E1"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=15");
     const body = await res.json();
     expect(body.source).toBe("LIVE");
     expect(body.vehicles.map((v: { route: string }) => v.route)).toEqual(["E1"]);
@@ -203,6 +203,7 @@ describe("retryAfterSecs", () => {
     const at = new Date(Date.now() + 90_000).toUTCString();
     expect(retryAfterSecs(at)).toBeGreaterThanOrEqual(89);
   });
+  it("treats a past HTTP-date as retry now", () => expect(retryAfterSecs(new Date(Date.now() - 5000).toUTCString())).toBe(0));
   it("defaults to 30 s", () => {
     expect(retryAfterSecs(null)).toBe(30);
     expect(retryAfterSecs("soon")).toBe(30);
@@ -218,7 +219,7 @@ describe("TripUpdates outage", () => {
     );
     expect(Object.keys((await (await GET(req())).json()).tripDelays)).toEqual(["6016_1"]);
     tripsDown = true;
-    await vi.advanceTimersByTimeAsync(31_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     expect(Object.keys((await (await GET(req())).json()).tripDelays)).toEqual(["6016_1"]);
     await vi.advanceTimersByTimeAsync(STALE_OK_MS);
     expect((await (await GET(req())).json()).tripDelays).toEqual({});

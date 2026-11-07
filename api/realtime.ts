@@ -29,9 +29,11 @@ export const ALLOWED_ROUTES = Object.values(ROUTE_IDS);
 
 const NTA_BASE = "https://api.nationaltransport.ie/gtfsr/v2";
 export const UPSTREAM_TIMEOUT_MS = 8000;
-const CACHE_OK = "public, s-maxage=30, stale-while-revalidate=60";
+// NTA allows roughly 1 call per feed per minute per key; the CDN must absorb all client polling.
+const CACHE_OK = "public, s-maxage=60, stale-while-revalidate=300";
+const CACHE_STALE = "public, s-maxage=15";
 /** On NTA failure (e.g. 429 rate limit) keep serving the last good LIVE data this long. */
-export const STALE_OK_MS = 120_000;
+export const STALE_OK_MS = 300_000;
 
 /** Returns the sorted, deduped route list, or null if any value is not allowlisted. Empty → all routes. */
 export function parseRoutes(raw: string | null): string[] | null {
@@ -101,9 +103,9 @@ export function mapTripDelays(feed: Feed, routes: string[]): RealtimeRes["tripDe
 /** Retry-After as seconds (delta-seconds or HTTP-date); 30 s if missing or invalid. */
 export function retryAfterSecs(raw: string | null): number {
   const n = Number(raw);
-  if (raw && Number.isFinite(n) && n > 0) return n;
+  if (raw && raw.trim() !== "" && Number.isFinite(n) && n >= 0) return n;
   const at = raw ? Date.parse(raw) : NaN;
-  return Number.isFinite(at) && at > Date.now() ? Math.ceil((at - Date.now()) / 1000) : 30;
+  return Number.isFinite(at) ? Math.max(0, Math.ceil((at - Date.now()) / 1000)) : 30;
 }
 
 class RateLimited extends Error {
@@ -134,7 +136,7 @@ const fallback = () => json(503, { fallback: true }, "no-store");
 
 // One upstream load per instance for all routes (incl. in-flight), filtered per request, so query variants
 // cannot multiply NTA calls. NTA rate-limits keys (429 + Retry-After), so we back off and serve last good data.
-const CACHE_TTL_MS = 30_000;
+const CACHE_TTL_MS = 60_000;
 type Snapshot = {
   fetchedAt: string;
   delaysAt: string;
@@ -202,7 +204,7 @@ export async function GET(request: Request): Promise<Response> {
   const staleOk = () => (lastGood && now - Date.parse(lastGood.fetchedAt) < STALE_OK_MS ? lastGood : null);
   if ((!memo || now - memo.at >= CACHE_TTL_MS) && now < backoffUntil) {
     const stale = staleOk();
-    return stale ? json(200, forRoutes(stale, routes), "no-store") : fallback();
+    return stale ? json(200, forRoutes(stale, routes), CACHE_STALE) : fallback();
   }
   if (!memo || now - memo.at >= CACHE_TTL_MS) {
     const fresh = { at: now, p: load(key) };
@@ -216,6 +218,6 @@ export async function GET(request: Request): Promise<Response> {
     const reqId = Math.random().toString(36).slice(2, 10);
     console.error(`[realtime ${reqId}] upstream failure: ${err instanceof Error ? err.name : "unknown"}`);
     const stale = staleOk();
-    return stale ? json(200, forRoutes(stale, routes), "no-store") : fallback();
+    return stale ? json(200, forRoutes(stale, routes), CACHE_STALE) : fallback();
   }
 }
