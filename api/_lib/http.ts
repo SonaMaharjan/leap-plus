@@ -1,3 +1,5 @@
+import { mockSheet } from "./mockSheet.js";
+
 const UPSTREAM_TIMEOUT_MS = 8000;
 
 const STATUS: Record<string, number> = {
@@ -43,7 +45,10 @@ export async function callSheet(payload: Record<string, unknown>): Promise<Respo
     return apiError("UPSTREAM_ERROR");
   }
   let data: Record<string, unknown>;
-  try {
+  if (url === "mock") {
+    await new Promise((r) => setTimeout(r, 600));
+    data = mockSheet(payload);
+  } else try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
