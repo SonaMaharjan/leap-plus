@@ -51,6 +51,8 @@ export function JourneyS17() {
   const shown = myBuses.length ? myBuses : vehicles;
 
   if (!it) return <Navigate to="/plan" replace />;
+  const firstDeparture = it.legs.find(isTransit)?.from.time;
+  const departed = !!firstDeparture && Date.parse(firstDeparture) < Date.now();
   const first = legs[0]?.leg.from;
   const last = legs[legs.length - 1]?.leg.to;
 
@@ -118,6 +120,14 @@ export function JourneyS17() {
               {hhmm(it.start)} – {hhmm(it.end)}
             </span>
           </div>
+          {departed && (
+            <p role="status" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              This journey has already left ({hhmm(firstDeparture!)}).{" "}
+              <button className="font-semibold underline" onClick={() => navigate("/plan")}>
+                Get fresh routes
+              </button>
+            </p>
+          )}
           <div className="mt-1">
             <LegChips it={it} />
           </div>
