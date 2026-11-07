@@ -34,7 +34,7 @@ export function EnterNumberS03() {
       back="/welcome"
       title="Enter card number"
       footer={
-        <Button disabled={!valid || !!error} loading={loading} onClick={submit}>
+        <Button disabled={!valid} loading={loading} onClick={submit}>
           Continue
         </Button>
       }
