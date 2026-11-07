@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { CONFIG } from "../../lib/config";
 import { formatCents } from "../../lib/money";
+import { useCardStore } from "../card/cardStore";
 import { dublinSecondsNow, formatClock, formatDelay, formatEta, nextArrivals } from "./eta";
 import { liveSearch, useLiveContext } from "./liveContext";
+import { SmartTopUpCard } from "./SmartTopUpCard";
 import { SkeletonRows } from "./StopListS14";
 
 /** S15 stop detail: next 3 arrivals (Live vs Scheduled) and the fare row. */
@@ -11,6 +13,11 @@ export function StopDetailS15() {
   const { stopId = "" } = useParams();
   const { route, dirIdx, routeState, rt } = useLiveContext();
   const [nowSecs, setNowSecs] = useState(() => dublinSecondsNow());
+  const balanceCents = useCardStore((s) => s.card?.balanceCents);
+  const refreshCard = useCardStore((s) => s.refresh);
+  useEffect(() => {
+    void refreshCard();
+  }, [refreshCard]);
   useEffect(() => {
     const t = setInterval(() => setNowSecs(dublinSecondsNow()), 15_000);
     return () => clearInterval(t);
@@ -51,6 +58,14 @@ export function StopDetailS15() {
         Stop #{stop.code} · Route {route} to {dir.headsign}
       </p>
 
+      <div className="mt-3 flex items-center justify-between rounded-card bg-neutral-50 px-3 py-3 text-sm">
+        <span className="text-ink-muted">Leap fare</span>
+        <span className="font-semibold">
+          Fare {formatCents(CONFIG.fareCents)}
+          {typeof balanceCents === "number" && ` · Balance ${formatCents(balanceCents)}`}
+        </span>
+      </div>
+      <SmartTopUpCard />
       <h2 className="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-muted">Next arrivals</h2>
       {arrivals.length === 0 ? (
         <p className="mt-2 text-sm text-ink-muted">No more departures today.</p>
@@ -79,10 +94,6 @@ export function StopDetailS15() {
         </ul>
       )}
 
-      <div className="mt-4 flex items-center justify-between rounded-card bg-neutral-50 px-3 py-3 text-sm">
-        <span className="text-ink-muted">Leap fare</span>
-        <span className="font-semibold">Fare {formatCents(CONFIG.fareCents)}</span>
-      </div>
     </section>
   );
 }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CONFIG } from "../../lib/config";
+import { hasDemoFlag } from "../../lib/demoFlags";
 import type { RealtimeRes } from "./types";
 
 export type DataMode = "LIVE" | "RECORDED";
@@ -19,7 +20,10 @@ async function fetchJson<T>(url: string): Promise<T> {
  * `?liveFail=1` forces the LIVE call to fail (demo flag).
  */
 export function useRealtime() {
-  const liveFail = useMemo(() => new URLSearchParams(window.location.search).get("liveFail") === "1", []);
+  const liveFail = useMemo(
+    () => hasDemoFlag("liveFail") || new URLSearchParams(window.location.search).get("liveFail") === "1",
+    [],
+  );
   const [mode, setMode] = useState<DataMode>("LIVE");
   const [data, setData] = useState<RealtimeRes | null>(null);
   const [toast, setToast] = useState<string | null>(null);
