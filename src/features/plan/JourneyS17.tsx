@@ -10,7 +10,7 @@ import { LiveBadge } from "../live/LiveBadge";
 import { useRealtime } from "../live/useRealtime";
 import { LegChips } from "./LegChips";
 import { hhmm, isTransit, liveStatus, mins, modeColor, modeLabel, type JourneyLeg } from "./planApi";
-import { usePlanStore } from "./planStore";
+import { PLAN_MAX_AGE_MS, usePlanStore } from "./planStore";
 import { decodePolyline } from "./polyline";
 
 const LIVE_ROUTES: readonly string[] = CONFIG.routes;
@@ -30,6 +30,7 @@ export function JourneyS17() {
   const { idx } = useParams();
   const navigate = useNavigate();
   const it = usePlanStore((s) => s.itineraries?.[Number(idx)]);
+  const stale = usePlanStore((s) => !s.plannedAt || Date.now() - s.plannedAt > PLAN_MAX_AGE_MS);
   const rt = useRealtime();
 
   const legs = useMemo(
@@ -50,7 +51,7 @@ export function JourneyS17() {
   const myBuses = vehicles.filter((v) => myTrips.has(v.tripId));
   const shown = myBuses.length ? myBuses : vehicles;
 
-  if (!it) return <Navigate to="/plan" replace />;
+  if (!it || stale) return <Navigate to="/plan" replace />;
   const first = legs[0]?.leg.from;
   const last = legs[legs.length - 1]?.leg.to;
 
@@ -151,8 +152,16 @@ export function JourneyS17() {
                       <p>
                         <b>{hhmm(leg.to.time)}</b> arrive {leg.to.name}
                       </p>
-                      {tracked && <p className="mt-1 text-xs font-semibold text-brand">Your bus is on the map (live position)</p>}
-                      {routeLive && !tracked && <p className="mt-1 text-xs text-ink-muted">Live {leg.route} buses shown on the map</p>}
+                      {tracked && (
+                        <p className="mt-1 text-xs font-semibold text-brand">
+                          {rt.mode === "LIVE" ? "Your bus is on the map (live position)" : "Your bus is on the map (RECORDED data)"}
+                        </p>
+                      )}
+                      {routeLive && !tracked && (
+                        <p className="mt-1 text-xs text-ink-muted">
+                          {rt.mode === "LIVE" ? "Live" : "Recorded"} {leg.route} buses shown on the map
+                        </p>
+                      )}
                     </div>
                   ) : (
                     <p className="flex-1 text-sm text-ink-muted">

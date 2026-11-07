@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { searchPlaces, type Place } from "./planApi";
 
 export function PlaceInput({ label, value, onChange }: { label: string; value: Place | null; onChange: (p: Place | null) => void }) {
@@ -6,8 +6,12 @@ export function PlaceInput({ label, value, onChange }: { label: string; value: P
   const [results, setResults] = useState<Place[]>([]);
   const [open, setOpen] = useState(false);
 
+  const typing = useRef(false);
+
   useEffect(() => {
     if (value) setText(value.name);
+    else if (!typing.current) setText("");
+    typing.current = false;
   }, [value]);
 
   useEffect(() => {
@@ -33,7 +37,10 @@ export function PlaceInput({ label, value, onChange }: { label: string; value: P
           onChange={(e) => {
             setText(e.target.value);
             setOpen(true);
-            if (value) onChange(null);
+            if (value) {
+              typing.current = true;
+              onChange(null);
+            }
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}

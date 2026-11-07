@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "../../ui/Button";
 import { ErrorPanel, Screen } from "../../ui/Screen";
 import { LegChips } from "./LegChips";
 import { PlaceInput } from "./PlaceInput";
 import { hhmm, isTransit, mins, walkSecs, type Place } from "./planApi";
-import { usePlanStore } from "./planStore";
+import { PLAN_MAX_AGE_MS, usePlanStore } from "./planStore";
 
 const DEMOS: [Place, Place][] = [
   [
@@ -27,8 +27,14 @@ const SORTS: { id: Sort; label: string }[] = [
 
 /** S16 Journey planner: from/to search and route comparison. */
 export function PlanS16() {
-  const { from, to, itineraries, status, setFrom, setTo, swap, plan } = usePlanStore();
+  const { from, to, itineraries, plannedAt, status, setFrom, setTo, swap, plan } = usePlanStore();
   const [sort, setSort] = useState<Sort>("fastest");
+
+  useEffect(() => {
+    if (itineraries && status !== "loading" && (!plannedAt || Date.now() - plannedAt > PLAN_MAX_AGE_MS)) void plan();
+    // Re-plan stale results once on entry only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const sorted = useMemo(() => {
     const list = (itineraries ?? []).map((it, idx) => ({ it, idx }));
