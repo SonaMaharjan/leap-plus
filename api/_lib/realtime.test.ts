@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GET, ROUTE_IDS, STALE_OK_MS, UPSTREAM_TIMEOUT_MS, clearRealtimeCache, parseRoutes } from "../realtime";
+import { GET, ROUTE_IDS, STALE_OK_MS, retryAfterSecs, UPSTREAM_TIMEOUT_MS, clearRealtimeCache, parseRoutes } from "../realtime";
 
 const vehiclesFeed = {
   header: { timestamp: "1794060000" },
@@ -71,7 +71,7 @@ describe("GET /api/realtime", () => {
     const fetchFn = mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
     const res = await GET(req("?routes=16,39A,E1"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toContain("s-maxage=30");
+    expect(res.headers.get("Cache-Control")).toContain("s-maxage=60");
     const body = await res.json();
     expect(body.source).toBe("LIVE");
     expect(body.vehicles).toEqual([
@@ -172,10 +172,10 @@ describe("NTA rate limit (429)", () => {
     );
     expect((await GET(req())).status).toBe(200);
     rateLimited = true;
-    await vi.advanceTimersByTimeAsync(31_000);
+    await vi.advanceTimersByTimeAsync(61_000);
     const res = await GET(req("?routes=E1"));
     expect(res.status).toBe(200);
-    expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(res.headers.get("Cache-Control")).toBe("public, s-maxage=15");
     const body = await res.json();
     expect(body.source).toBe("LIVE");
     expect(body.vehicles.map((v: { route: string }) => v.route)).toEqual(["E1"]);
@@ -194,6 +194,35 @@ describe("NTA rate limit (429)", () => {
     rateLimited = true;
     await vi.advanceTimersByTimeAsync(STALE_OK_MS + 1000);
     expect((await GET(req())).status).toBe(503);
+  });
+});
+
+describe("retryAfterSecs", () => {
+  it("parses delta-seconds", () => expect(retryAfterSecs("27")).toBe(27));
+  it("parses an HTTP-date", () => {
+    const at = new Date(Date.now() + 90_000).toUTCString();
+    expect(retryAfterSecs(at)).toBeGreaterThanOrEqual(89);
+  });
+  it("treats a past HTTP-date as retry now", () => expect(retryAfterSecs(new Date(Date.now() - 5000).toUTCString())).toBe(0));
+  it("defaults to 30 s", () => {
+    expect(retryAfterSecs(null)).toBe(30);
+    expect(retryAfterSecs("soon")).toBe(30);
+  });
+});
+
+describe("TripUpdates outage", () => {
+  it("drops carried-over delays once they are older than the stale window", async () => {
+    vi.useFakeTimers();
+    let tripsDown = false;
+    mockUpstream(async (url) =>
+      url.includes("Vehicles") ? ok(vehiclesFeed) : tripsDown ? new Response("", { status: 500 }) : ok(tripsFeed),
+    );
+    expect(Object.keys((await (await GET(req())).json()).tripDelays)).toEqual(["6016_1"]);
+    tripsDown = true;
+    await vi.advanceTimersByTimeAsync(61_000);
+    expect(Object.keys((await (await GET(req())).json()).tripDelays)).toEqual(["6016_1"]);
+    await vi.advanceTimersByTimeAsync(STALE_OK_MS);
+    expect((await (await GET(req())).json()).tripDelays).toEqual({});
   });
 });
 
