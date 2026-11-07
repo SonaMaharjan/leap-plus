@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatCents } from "../../lib/money";
 
 type Props = { amountCents: number; onPaid: () => void; onClose: () => void };
@@ -6,11 +6,18 @@ type Props = { amountCents: number; onPaid: () => void; onClose: () => void };
 /** Look-alike Apple Pay sheet. Simulated: Apple Pay on the web needs a verified merchant domain. */
 export function ApplePaySimS09({ amountCents, onPaid, onClose }: Props) {
   const [stage, setStage] = useState<"confirm" | "faceid" | "done">("confirm");
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearTimers = () => timers.current.forEach(clearTimeout);
+  useEffect(() => clearTimers, []);
 
   function pay() {
     setStage("faceid");
-    setTimeout(() => setStage("done"), 1000);
-    setTimeout(onPaid, 1500);
+    timers.current = [setTimeout(() => setStage("done"), 1000), setTimeout(onPaid, 1500)];
+  }
+
+  function close() {
+    clearTimers();
+    onClose();
   }
 
   return (
@@ -19,7 +26,7 @@ export function ApplePaySimS09({ amountCents, onPaid, onClose }: Props) {
         <div className="flex items-center justify-between">
           <span className="text-lg font-semibold"> Pay</span>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Simulated</span>
-          <button onClick={onClose} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-ink-muted">
+          <button onClick={close} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-ink-muted">
             ✕
           </button>
         </div>
