@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { consumeDemoFlag } from "../../lib/demoFlags";
+import { consumeDemoFlag, hasDemoFlag } from "../../lib/demoFlags";
 import { Button } from "../../ui/Button";
 import { Screen } from "../../ui/Screen";
 import { useCardStore } from "./cardStore";
@@ -17,9 +17,11 @@ export function ScanS02() {
   useEffect(() => {
     let alive = true;
     setState("scanning");
-    const fail = consumeDemoFlag("scanFail");
     const t = setTimeout(async () => {
-      if (fail) return alive && setState("failed");
+      if (hasDemoFlag("scanFail")) {
+        consumeDemoFlag("scanFail");
+        return alive && setState("failed");
+      }
       try {
         await load(DEMO_CARD);
         if (!alive) return;
