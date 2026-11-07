@@ -41,6 +41,20 @@ describe("nextArrivals", () => {
     expect(r.map((a) => a.tripId)).toEqual(["C", "B", "D"]);
   });
 
+  it("puts overnight trips (GTFS times past 24:00) first just after midnight", () => {
+    const night: Direction = {
+      ...dir,
+      timetable: [
+        { tripId: "M", startSecs: at(6, 0), stopOffsetsSecs: [0, 600] },
+        { tripId: "N", startSecs: at(24, 20), stopOffsetsSecs: [0, 600] },
+      ],
+    };
+    const r = nextArrivals(night, 1, at(0, 10));
+    expect(r.map((a) => a.tripId)).toEqual(["N", "M"]);
+    expect(r[0].etaSecs).toBe(at(0, 30));
+    expect(nextArrivals(night, 1, at(23, 50))[0]).toMatchObject({ tripId: "N", etaSecs: at(24, 30) });
+  });
+
   it("returns empty after the last departure", () => expect(nextArrivals(dir, 1, at(23, 0))).toEqual([]));
 });
 
