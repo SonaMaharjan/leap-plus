@@ -3,6 +3,9 @@ import { createRoot } from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
 import { router } from "./app/routes";
 import "./index.css";
+import { captureDemoFlags } from "./lib/demoFlags";
+
+captureDemoFlags();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
