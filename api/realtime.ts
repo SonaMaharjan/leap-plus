@@ -114,21 +114,12 @@ function json(status: number, body: unknown, cache: string): Response {
 
 const fallback = () => json(503, { fallback: true }, "no-store");
 
-// Per-instance cache so query-string variants cannot bypass the CDN and burn NTA quota.
+// Per-instance cache (incl. in-flight fetches) so query-string variants cannot bypass the CDN and burn NTA quota.
 const CACHE_TTL_MS = 20_000;
-const memo = new Map<string, { at: number; body: RealtimeRes }>();
+const memo = new Map<string, { at: number; p: Promise<RealtimeRes> }>();
 export const clearRealtimeCache = () => memo.clear();
 
-export async function GET(request: Request): Promise<Response> {
-  const url = new URL(request.url);
-  const routes = parseRoutes(url.searchParams.get("routes"));
-  if (!routes) return json(400, { error: "INVALID_ROUTE" }, "no-store");
-  const key = process.env.NTA_KEY;
-  if (!key) return fallback();
-  const cacheKey = routes.join(",");
-  const hit = memo.get(cacheKey);
-  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return json(200, hit.body, CACHE_OK);
-
+async function load(routes: string[], key: string): Promise<RealtimeRes> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), UPSTREAM_TIMEOUT_MS);
   try {
@@ -138,20 +129,38 @@ export async function GET(request: Request): Promise<Response> {
       fetchFeed("TripUpdates", key, ctrl.signal),
     ]);
     if (vehicles.status === "rejected") throw vehicles.reason;
-    const body: RealtimeRes = {
+    return {
       source: "LIVE",
       fetchedAt: new Date().toISOString(),
       vehicles: mapVehicles(vehicles.value, routes),
       tripDelays: trips.status === "fulfilled" ? mapTripDelays(trips.value, routes) : {},
     };
-    memo.set(cacheKey, { at: Date.now(), body });
-    return json(200, body, CACHE_OK);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  const url = new URL(request.url);
+  const routes = parseRoutes(url.searchParams.get("routes"));
+  if (!routes) return json(400, { error: "INVALID_ROUTE" }, "no-store");
+  const key = process.env.NTA_KEY;
+  if (!key) return fallback();
+  const cacheKey = routes.join(",");
+  let entry = memo.get(cacheKey);
+  if (!entry || Date.now() - entry.at >= CACHE_TTL_MS) {
+    const p = load(routes, key);
+    const fresh = { at: Date.now(), p };
+    entry = fresh;
+    memo.set(cacheKey, fresh);
+    p.catch(() => memo.get(cacheKey) === fresh && memo.delete(cacheKey));
+  }
+  try {
+    return json(200, await entry.p, CACHE_OK);
   } catch (err) {
     // F10: generic body to the client; F6: never log headers or the key.
     const reqId = Math.random().toString(36).slice(2, 10);
     console.error(`[realtime ${reqId}] upstream failure: ${err instanceof Error ? err.name : "unknown"}`);
     return fallback();
-  } finally {
-    clearTimeout(timer);
   }
 }
