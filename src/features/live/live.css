@@ -1,0 +1,26 @@
+.bus-marker {
+  position: relative;
+  display: flex;
+  height: 24px;
+  width: 40px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 2px solid #fff;
+  background: #3ba935;
+  color: #fff;
+  font: 700 11px/1 Inter, system-ui, sans-serif;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+.bus-arrow {
+  position: absolute;
+  inset: -9px 0 auto 0;
+  margin: 0 auto;
+  height: 0;
+  width: 0;
+  transform-origin: 50% 21px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid #2e8a29;
+}
+.leaflet-container { background: #e5e5e5; font-family: inherit; }
