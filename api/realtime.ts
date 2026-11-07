@@ -35,7 +35,7 @@ const CACHE_OK = "public, s-maxage=20, stale-while-revalidate=40";
 export function parseRoutes(raw: string | null): string[] | null {
   if (raw === null || raw.trim() === "") return [...ALLOWED_ROUTES].sort();
   const parts = raw.split(",").map((s) => s.trim().toUpperCase());
-  if (parts.length > ALLOWED_ROUTES.length || parts.some((p) => !ALLOWED_ROUTES.includes(p))) return null;
+  if (parts.length > 10 || parts.some((p) => !ALLOWED_ROUTES.includes(p))) return null;
   return [...new Set(parts)].sort();
 }
 
@@ -115,8 +115,17 @@ function json(status: number, body: unknown, cache: string): Response {
 const fallback = () => json(503, { fallback: true }, "no-store");
 
 export async function GET(request: Request): Promise<Response> {
-  const routes = parseRoutes(new URL(request.url).searchParams.get("routes"));
+  const url = new URL(request.url);
+  const routes = parseRoutes(url.searchParams.get("routes"));
   if (!routes) return json(400, { error: "INVALID_ROUTE" }, "no-store");
+  // F7: one cache key per route set — redirect order/case/extra-param variants to the canonical URL.
+  const canonical = `?routes=${routes.join(",")}`;
+  if (url.search !== canonical) {
+    return new Response(null, {
+      status: 308,
+      headers: { Location: `${url.pathname}${canonical}`, "Cache-Control": "public, s-maxage=3600" },
+    });
+  }
 
   const key = process.env.NTA_API_KEY;
   if (!key) return fallback();
