@@ -18,17 +18,23 @@ function apiDev(): Plugin {
         }
         const handler = mod[req.method ?? "GET"];
         if (typeof handler !== "function") return next();
-        const chunks: Buffer[] = [];
-        for await (const c of req) chunks.push(c as Buffer);
-        const request = new Request(url, {
-          method: req.method,
-          headers: req.headers as Record<string, string>,
-          body: chunks.length ? Buffer.concat(chunks) : undefined,
-        });
-        const response = (await handler(request)) as Response;
-        res.statusCode = response.status;
-        response.headers.forEach((v, k) => res.setHeader(k, v));
-        res.end(Buffer.from(await response.arrayBuffer()));
+        try {
+          const chunks: Buffer[] = [];
+          for await (const c of req) chunks.push(c as Buffer);
+          const request = new Request(url, {
+            method: req.method,
+            headers: req.headers as Record<string, string>,
+            body: chunks.length ? Buffer.concat(chunks) : undefined,
+          });
+          const response = (await handler(request)) as Response;
+          res.statusCode = response.status;
+          response.headers.forEach((v, k) => res.setHeader(k, v));
+          res.end(Buffer.from(await response.arrayBuffer()));
+        } catch (err) {
+          server.config.logger.warn(`[api-dev] ${req.url}: ${(err as Error).message}`);
+          if (!res.headersSent) res.statusCode = 502;
+          res.end();
+        }
       });
     },
   };
