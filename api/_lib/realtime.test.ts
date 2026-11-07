@@ -100,6 +100,13 @@ describe("GET /api/realtime", () => {
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 
+  it("shares one in-flight upstream fetch across parallel variants", async () => {
+    const fetchFn = mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
+    const res = await Promise.all(["?routes=16&a=1", "?routes=16&a=2", "?routes=16&a=3"].map((q) => GET(req(q))));
+    expect(res.map((r) => r.status)).toEqual([200, 200, 200]);
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
   it("accepts route lists in any order or case", async () => {
     mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
     for (const qs of ["?routes=E1,16", "?routes=e1,16,E1", "?routes=16%2CE1"]) {
