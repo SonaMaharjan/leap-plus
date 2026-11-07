@@ -9,7 +9,7 @@ export const LIVE_RETRY_MS = 60_000;
 const ROUTES_PARAM = [...CONFIG.routes].sort().join(",");
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url, { signal: AbortSignal.timeout(CONFIG.apiTimeoutMs) });
+  const res = await fetch(url, { signal: AbortSignal.timeout(CONFIG.apiTimeoutMs + 2000) });
   if (!res.ok) throw new Error(`${url} ${res.status}`);
   return (await res.json()) as T;
 }

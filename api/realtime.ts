@@ -28,7 +28,7 @@ export const ROUTE_IDS: Record<string, string> = {
 export const ALLOWED_ROUTES = Object.values(ROUTE_IDS);
 
 const NTA_BASE = "https://api.nationaltransport.ie/gtfsr/v2";
-export const UPSTREAM_TIMEOUT_MS = 5000;
+export const UPSTREAM_TIMEOUT_MS = 8000;
 const CACHE_OK = "public, s-maxage=20, stale-while-revalidate=40";
 
 /** Returns the sorted, deduped route list, or null if any value is not allowlisted. Empty → all routes. */
