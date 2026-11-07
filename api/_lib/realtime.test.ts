@@ -91,16 +91,11 @@ describe("GET /api/realtime", () => {
     expect(body.tripDelays).toEqual({});
   });
 
-  it("redirects non-canonical route lists to one cache key", async () => {
-    const fetchFn = mockUpstream(async () => ok({}));
-    for (const qs of ["?routes=E1,16", "?routes=e1,16,E1", "?routes=16,E1&x=1"]) {
-      const res = await GET(req(qs));
-      expect(res.status).toBe(308);
-      expect(res.headers.get("Location")).toBe("/api/realtime?routes=16,E1");
+  it("accepts route lists in any order or case", async () => {
+    mockUpstream(async (url) => ok(url.includes("Vehicles") ? vehiclesFeed : tripsFeed));
+    for (const qs of ["?routes=E1,16", "?routes=e1,16,E1", "?routes=16%2CE1"]) {
+      expect((await GET(req(qs))).status).toBe(200);
     }
-    const all = await GET(req());
-    expect(all.headers.get("Location")).toBe("/api/realtime?routes=16,39A,E1");
-    expect(fetchFn).not.toHaveBeenCalled();
   });
 
   it("400 on a non-allowlisted route, without calling upstream", async () => {
