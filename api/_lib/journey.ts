@@ -86,8 +86,22 @@ export const PHOTON = "https://photon.komoot.io/api/";
 export const PHOTON_PARAMS = `bbox=${BBOX.minLon},${BBOX.minLat},${BBOX.maxLon},${BBOX.maxLat}&lat=53.3498&lon=-6.2603&limit=10&lang=en`;
 
 const ADMIN_NOISE = /\bWard\b|\bD?ED\b|Electoral|Municipal District/;
+// Big, well-known places: listed first, and labelled by area only (their "street" is just the nearest road).
+const MAJOR = /^(university|college|hospital|station|bus_station|aerodrome|mall|stadium|park|attraction|museum|city|town|village|suburb|neighbourhood|quarter)$/;
 
-function metresApprox(a: LatLon, b: LatLon): number {
+/** 0 = major place, 1 = normal, 2 = bare address point (e.g. a gate named after a campus). */
+function rank(p: any): number {
+  if (MAJOR.test(p?.osm_value ?? "")) return 0;
+  return p?.osm_key === "place" && p?.osm_value === "house" ? 2 : 1;
+}
+
+/** Eircode routing key → postal district, e.g. "D04 A9P2" → "Dublin 4", "D6W XY12" → "Dublin 6W". */
+function postalDistrict(postcode?: string): string | undefined {
+  const m = postcode?.toUpperCase().match(/^D(\d{2}|6W)\b/);
+  return m ? `Dublin ${m[1] === "6W" ? "6W" : Number(m[1])}` : undefined;
+}
+
+export function metresApprox(a: LatLon, b: LatLon): number {
   const x = (b.lon - a.lon) * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180));
   return Math.hypot(x, b.lat - a.lat) * 111_320;
 }
@@ -95,18 +109,21 @@ function metresApprox(a: LatLon, b: LatLon): number {
 /** Photon GeoJSON → places with a street address, e.g. "14 Liffey Street Upper, Dublin 1". */
 export function trimPhoton(raw: any): Place[] {
   const features: any[] = Array.isArray(raw?.features) ? raw.features : [];
+  const ranked = features.map((f) => ({ f, r: rank(f?.properties) })).sort((a, b) => a.r - b.r);
   const out: Place[] = [];
-  for (const f of features) {
+  for (const { f, r } of ranked) {
     const p = f?.properties ?? {};
     const [lon, lat] = Array.isArray(f?.geometry?.coordinates) ? f.geometry.coordinates.map(Number) : [NaN, NaN];
     if (!inIreland(lat, lon) || (p.countrycode && p.countrycode !== "IE")) continue;
     if (p.osm_key === "highway" && p.type !== "street" && p.osm_value !== "bus_stop") continue;
-    const street = [str(p.housenumber), str(p.street)].filter(Boolean).join(" ");
-    const name = str(p.name) ?? street;
+    if (p.osm_key === "boundary") continue;
+    const address = [str(p.housenumber), str(p.street)].filter(Boolean).join(" ");
+    const name = str(p.name) ?? address;
     if (!name) continue;
+    const street = r === 0 ? "" : address;
     const county = str(p.county);
-    const postalDistrict = county && /^Dublin \d+W?$/.test(county) ? county : undefined;
-    const town = postalDistrict ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
+    const district = (county && /^Dublin \d+W?$/.test(county) ? county : undefined) ?? postalDistrict(str(p.postcode));
+    const town = district ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
     const area = [street, town].filter((part, i, all) => part && part !== name && all.indexOf(part) === i).join(", ");
     // Same name within 30 m (or same label within 150 m) = duplicate platform/entrance; farther = a separate branch.
     const dupe = (o: Place) => {

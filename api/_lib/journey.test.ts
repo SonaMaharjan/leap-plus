@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { GET as geocode } from "../geocode";
 import { parseLatLon, trimGeocode, trimPhoton, trimPlan } from "./journey";
+import { matchLandmarks } from "./landmarks";
 
 describe("parseLatLon", () => {
   it("accepts Irish coordinates", () => expect(parseLatLon("53.3438,-6.2546")).toEqual({ lat: 53.3438, lon: -6.2546 }));
@@ -112,6 +113,43 @@ describe("trimPhoton", () => {
   });
 });
 
+describe("trimPhoton ranking and labels", () => {
+  it("lists big places first, bare address points last, and labels big places by area only", () => {
+    const gate = feature({ name: "UCD", osm_key: "place", osm_value: "house", street: "Merville", city: "Dundrum", county: "County Dublin" }, -6.22, 53.31);
+    const shop = feature({ name: "UCD Bookshop", osm_key: "shop", osm_value: "books", street: "Library Road", county: "Dublin 4" }, -6.223, 53.307);
+    const uni = feature({ name: "Trinity College Dublin", osm_key: "amenity", osm_value: "university", street: "College Green", county: "Dublin 2" }, -6.2544, 53.3437);
+    const oldBoundary = feature({ name: "St James's Division 1918", osm_key: "boundary", osm_value: "administrative", county: "Dublin 8" });
+    expect(trimPhoton({ features: [gate, shop, oldBoundary, uni] }).map((p) => [p.name, p.area])).toEqual([
+      ["Trinity College Dublin", "Dublin 2"],
+      ["UCD Bookshop", "Library Road, Dublin 4"],
+      ["UCD", "Merville, Dundrum"],
+    ]);
+  });
+
+  it("uses the Eircode routing key for the Dublin postal district", () => {
+    const office = feature({ name: "Belfield Office Park", osm_key: "landuse", osm_value: "commercial", city: "Dundrum", county: "County Dublin", postcode: "D04 A9P2" });
+    expect(trimPhoton({ features: [office] })[0].area).toBe("Dublin 4");
+    const d6w = feature({ name: "Shop", street: "Main Street", county: "County Dublin", postcode: "d6w ab12" });
+    expect(trimPhoton({ features: [d6w] })[0].area).toBe("Main Street, Dublin 6W");
+  });
+});
+
+describe("matchLandmarks", () => {
+  it("finds well-known places by abbreviation or name, ignoring punctuation and accents", () => {
+    expect(matchLandmarks("ucd")).toEqual([{ name: "University College Dublin", area: "Belfield, Dublin 4", lat: 53.3068, lon: -6.2246 }]);
+    expect(matchLandmarks("St. James's")[0].name).toBe("St James's Hospital");
+    expect(matchLandmarks("saint james")[0].name).toBe("St James's Hospital");
+    expect(matchLandmarks("busaras")[0].name).toBe("Busáras");
+    expect(matchLandmarks("hospital").length).toBeLessThanOrEqual(2);
+  });
+
+  it("ignores unrelated or too-short queries", () => {
+    expect(matchLandmarks("Henry Street")).toEqual([]);
+    expect(matchLandmarks("u")).toEqual([]);
+    expect(matchLandmarks("ho")).toEqual([]);
+  });
+});
+
 describe("GET /api/geocode", () => {
   afterEach(() => vi.unstubAllGlobals());
   const call = () => geocode(new Request("http://x/api/geocode?q=L%27Occitane"));
@@ -138,6 +176,21 @@ describe("GET /api/geocode", () => {
       expect((await res.json()).places[0].name).toBe("Trinity College");
       expect(res.headers.get("Cache-Control")).toContain(photon().ok ? "s-maxage=3600" : "s-maxage=60");
     }
+  });
+
+  it("puts a matching landmark first and drops Photon's copy of it", async () => {
+    const campus = feature({ name: "University College Dublin (Belfield Campus)", osm_key: "amenity", osm_value: "university", city: "Blackrock" }, -6.2245, 53.3069);
+    const gate = feature({ name: "UCD", osm_key: "place", osm_value: "house", street: "Merville", city: "Dundrum" }, -6.22, 53.31);
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ features: [gate, campus] })));
+    const body = await (await geocode(new Request("http://x/api/geocode?q=ucd"))).json();
+    expect(body.places.map((p: { name: string }) => p.name)).toEqual(["University College Dublin", "UCD"]);
+  });
+
+  it("still returns landmarks when both upstreams fail", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { status: 500 })));
+    const res = await geocode(new Request("http://x/api/geocode?q=ucd"));
+    expect(res.status).toBe(200);
+    expect((await res.json()).places[0].area).toBe("Belfield, Dublin 4");
   });
 
   it("returns a generic 502 when both fail", async () => {
