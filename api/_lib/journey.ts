@@ -72,7 +72,7 @@ export function trimPlan(raw: any): PlanRes {
 export function trimGeocode(raw: any): Place[] {
   const list: any[] = Array.isArray(raw) ? raw : [];
   return list
-    .filter((p) => inIreland(num(p?.lat), num(p?.lon)))
+    .filter((p) => inIreland(num(p?.lat), num(p?.lon)) && (!p?.country || p.country === "IE"))
     .slice(0, 6)
     .map((p) => {
       const areas: any[] = Array.isArray(p.areas) ? p.areas : [];
@@ -99,7 +99,7 @@ export function trimPhoton(raw: any): Place[] {
   for (const f of features) {
     const p = f?.properties ?? {};
     const [lon, lat] = Array.isArray(f?.geometry?.coordinates) ? f.geometry.coordinates.map(Number) : [NaN, NaN];
-    if (!inIreland(lat, lon)) continue;
+    if (!inIreland(lat, lon) || (p.countrycode && p.countrycode !== "IE")) continue;
     if (p.osm_key === "highway" && p.type !== "street" && p.osm_value !== "bus_stop") continue;
     const street = [str(p.housenumber), str(p.street)].filter(Boolean).join(" ");
     const name = str(p.name) ?? street;
