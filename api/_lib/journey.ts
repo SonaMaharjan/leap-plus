@@ -104,7 +104,8 @@ export function trimPhoton(raw: any): Place[] {
     const postalDistrict = county && /^Dublin \d+W?$/.test(county) ? county : undefined;
     const town = postalDistrict ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
     const area = [street, town].filter((part, i, all) => part && part !== name && all.indexOf(part) === i).join(", ");
-    const key = `${name}|${area}`;
+    // ~100 m grid: merges duplicate platforms/entrances, keeps separate branches on the same street.
+    const key = `${name}|${area}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ name, area, lat, lon });

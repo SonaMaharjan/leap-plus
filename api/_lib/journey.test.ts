@@ -97,6 +97,12 @@ describe("trimPhoton", () => {
     expect(out[1].area).toBe("Dublin 1");
     expect(trimPhoton(null)).toEqual([]);
   });
+
+  it("keeps same-named branches on one street when they are far apart", () => {
+    const a = feature({ name: "Tesco", street: "Main Street", city: "Dublin" }, -6.26, 53.34);
+    const b = feature({ name: "Tesco", street: "Main Street", city: "Dublin" }, -6.3, 53.39);
+    expect(trimPhoton({ features: [a, b] })).toHaveLength(2);
+  });
 });
 
 describe("GET /api/geocode", () => {
