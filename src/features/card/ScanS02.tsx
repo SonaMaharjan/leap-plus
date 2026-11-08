@@ -14,27 +14,40 @@ export function ScanS02() {
   const load = useCardStore((s) => s.load);
   const [state, setState] = useState<"scanning" | "found" | "failed">("scanning");
   const [attempt, setAttempt] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
     let alive = true;
     setState("scanning");
+    setProgress(0);
+    const start = Date.now();
+    // Fills to 90% over the scan, then creeps toward 95% while the card loads.
+    const tick = setInterval(() => {
+      const elapsed = Date.now() - start;
+      setProgress(elapsed < SCAN_MS ? (elapsed / SCAN_MS) * 90 : Math.min(95, 90 + (elapsed - SCAN_MS) / 200));
+    }, 50);
     const t = setTimeout(async () => {
       if (hasDemoFlag("scanFail")) {
         consumeDemoFlag("scanFail");
+        clearInterval(tick);
         return alive && setState("failed");
       }
       try {
         await load(DEMO_CARD);
         if (!alive) return;
+        clearInterval(tick);
+        setProgress(100);
         setState("found");
         setTimeout(() => alive && navigate("/", { replace: true }), 800);
       } catch {
+        clearInterval(tick);
         if (alive) setState("failed");
       }
     }, SCAN_MS);
     return () => {
       alive = false;
       clearTimeout(t);
+      clearInterval(tick);
     };
   }, [attempt, load, navigate]);
 
@@ -45,13 +58,19 @@ export function ScanS02() {
         {state === "scanning" && (
           <>
             <h1 className="mt-6 text-xl font-bold">Hold your Leap card to the back, top of your phone</h1>
-            <p className="mt-3 rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-ink-muted">Ready to scan · simulated</p>
+            <ScanProgress state={state} progress={progress} />
           </>
         )}
-        {state === "found" && <h1 className="mt-6 text-xl font-bold text-brand-dark">Card found</h1>}
+        {state === "found" && (
+          <>
+            <h1 className="mt-6 text-xl font-bold text-brand-dark">Card found</h1>
+            <ScanProgress state={state} progress={progress} />
+          </>
+        )}
         {state === "failed" && (
           <div className="mt-6 w-full space-y-3">
             <h1 className="text-xl font-bold">We could not read your card.</h1>
+            <ScanProgress state={state} progress={progress} />
             <Button onClick={() => setAttempt((a) => a + 1)}>Try again</Button>
             <Button variant="secondary" onClick={() => navigate("/enter")}>
               Enter number instead
@@ -91,6 +110,32 @@ function TapIllustration({ state }: { state: "scanning" | "found" | "failed" }) 
             <Nfc className="h-10 w-10 text-brand motion-safe:animate-pulse" strokeWidth={2} />
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ScanProgress({ state, progress }: { state: "scanning" | "found" | "failed"; progress: number }) {
+  const pct = Math.round(progress);
+  const label = state === "found" ? "Card read" : state === "failed" ? "Scan failed" : "Reading card…";
+  return (
+    <div className="mx-auto mt-5 w-full max-w-[260px] pb-1">
+      <div className="mb-1.5 flex justify-between text-xs font-semibold">
+        <span className={state === "failed" ? "text-red-600" : "text-ink-muted"}>{label}</span>
+        <span className="text-ink-muted">{state === "failed" ? "simulated" : `${pct}% · simulated`}</span>
+      </div>
+      <div
+        className="h-2 overflow-hidden rounded-full bg-neutral-200"
+        role="progressbar"
+        aria-label="Card scan progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={pct}
+      >
+        <div
+          className={`h-full rounded-full transition-[width] duration-100 ease-linear ${state === "failed" ? "bg-red-500" : "bg-brand"}`}
+          style={{ width: `${state === "failed" ? 100 : pct}%` }}
+        />
       </div>
     </div>
   );
