@@ -129,6 +129,7 @@ describe("GET /api/geocode", () => {
       const res = await call();
       expect(res.status).toBe(200);
       expect((await res.json()).places[0].name).toBe("Trinity College");
+      expect(res.headers.get("Cache-Control")).toContain(photon().ok ? "s-maxage=3600" : "s-maxage=60");
     }
   });
 
