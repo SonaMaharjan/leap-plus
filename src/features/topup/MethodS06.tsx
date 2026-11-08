@@ -1,3 +1,4 @@
+import { ChevronRight, CreditCard } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { formatCents } from "../../lib/money";
@@ -36,8 +37,11 @@ export function MethodS06() {
           onClick={() => navigate("/topup/confirm")}
           className="flex min-h-[56px] w-full items-center justify-between rounded-2xl border-2 border-neutral-200 px-4 text-left font-semibold active:bg-neutral-50"
         >
-          <span>💳 Saved card •••• 4242</span>
-          <span className="text-ink-muted">›</span>
+          <span className="flex items-center gap-3">
+            <CreditCard className="h-5 w-5 text-ink-muted" aria-hidden />
+            Saved card •••• 4242
+          </span>
+          <ChevronRight className="h-5 w-5 text-ink-muted" aria-hidden />
         </button>
       </div>
       {applePay && <ApplePaySimS09 amountCents={amountCents} onPaid={() => pay("APPLE_PAY_SIM")} onClose={() => setApplePay(false)} />}
