@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { formatCents } from "../../lib/money";
 import { Button } from "../../ui/Button";
@@ -24,7 +25,9 @@ export function SuccessS11() {
       }
     >
       <div className="flex flex-col items-center pt-16 text-center">
-        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-5xl text-white">✓</div>
+        <div className="flex h-24 w-24 items-center justify-center rounded-full bg-brand text-white" aria-hidden>
+          <Check className="h-12 w-12" strokeWidth={3} />
+        </div>
         <h1 className="mt-6 text-2xl font-bold">Top-up complete</h1>
         <p className="mt-2 text-3xl font-bold text-brand-dark">+{formatCents(amountCents)}</p>
         <p className="mt-4 text-lg">New balance {formatCents(result.balanceCents)}</p>

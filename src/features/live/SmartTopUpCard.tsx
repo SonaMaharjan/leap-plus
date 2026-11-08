@@ -1,3 +1,4 @@
+import { Check } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { CONFIG } from "../../lib/config";
 import { newIdempotencyKey } from "../../lib/ids";
@@ -66,8 +67,8 @@ export function SmartTopUpCard() {
       )}
       {state === "done" && (
         <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-lg font-bold text-white" aria-hidden>
-            ✓
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand text-white" aria-hidden>
+            <Check className="h-5 w-5" strokeWidth={3} />
           </span>
           <div>
             <p className="text-sm font-bold">Topped up. Balance {formatCents(card.balanceCents)}.</p>
