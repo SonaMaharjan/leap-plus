@@ -87,10 +87,14 @@ export const PHOTON_PARAMS = `bbox=${BBOX.minLon},${BBOX.minLat},${BBOX.maxLon},
 
 const ADMIN_NOISE = /\bWard\b|\bD?ED\b|Electoral|Municipal District/;
 
+function metresApprox(a: LatLon, b: LatLon): number {
+  const x = (b.lon - a.lon) * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180));
+  return Math.hypot(x, b.lat - a.lat) * 111_320;
+}
+
 /** Photon GeoJSON → places with a street address, e.g. "14 Liffey Street Upper, Dublin 1". */
 export function trimPhoton(raw: any): Place[] {
   const features: any[] = Array.isArray(raw?.features) ? raw.features : [];
-  const seen = new Set<string>();
   const out: Place[] = [];
   for (const f of features) {
     const p = f?.properties ?? {};
@@ -104,10 +108,8 @@ export function trimPhoton(raw: any): Place[] {
     const postalDistrict = county && /^Dublin \d+W?$/.test(county) ? county : undefined;
     const town = postalDistrict ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
     const area = [street, town].filter((part, i, all) => part && part !== name && all.indexOf(part) === i).join(", ");
-    // ~100 m grid: merges duplicate platforms/entrances, keeps separate branches on the same street.
-    const key = `${name}|${area}|${lat.toFixed(3)}|${lon.toFixed(3)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // Same label within ~150 m = duplicate platform/entrance; farther away = a separate branch.
+    if (out.some((o) => o.name === name && o.area === area && metresApprox(o, { lat, lon }) < 150)) continue;
     out.push({ name, area, lat, lon });
     if (out.length === 6) break;
   }

@@ -102,6 +102,8 @@ describe("trimPhoton", () => {
     const a = feature({ name: "Tesco", street: "Main Street", city: "Dublin" }, -6.26, 53.34);
     const b = feature({ name: "Tesco", street: "Main Street", city: "Dublin" }, -6.3, 53.39);
     expect(trimPhoton({ features: [a, b] })).toHaveLength(2);
+    const nearA = feature({ name: "Tesco", street: "Main Street", city: "Dublin" }, -6.2595, 53.3405);
+    expect(trimPhoton({ features: [a, nearA] })).toHaveLength(1);
   });
 });
 
