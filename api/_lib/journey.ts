@@ -108,8 +108,12 @@ export function trimPhoton(raw: any): Place[] {
     const postalDistrict = county && /^Dublin \d+W?$/.test(county) ? county : undefined;
     const town = postalDistrict ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
     const area = [street, town].filter((part, i, all) => part && part !== name && all.indexOf(part) === i).join(", ");
-    // Same label within ~150 m = duplicate platform/entrance; farther away = a separate branch.
-    if (out.some((o) => o.name === name && o.area === area && metresApprox(o, { lat, lon }) < 150)) continue;
+    // Same name within 30 m (or same label within 150 m) = duplicate platform/entrance; farther = a separate branch.
+    const dupe = (o: Place) => {
+      const d = metresApprox(o, { lat, lon });
+      return o.name === name && (d < 30 || (o.area === area && d < 150));
+    };
+    if (out.some(dupe)) continue;
     out.push({ name, area, lat, lon });
     if (out.length === 6) break;
   }
