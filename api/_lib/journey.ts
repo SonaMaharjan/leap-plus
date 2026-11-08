@@ -96,7 +96,7 @@ export function trimPhoton(raw: any): Place[] {
     const p = f?.properties ?? {};
     const [lon, lat] = Array.isArray(f?.geometry?.coordinates) ? f.geometry.coordinates.map(Number) : [NaN, NaN];
     if (!inIreland(lat, lon)) continue;
-    if (p.osm_key === "highway" && p.type !== "street") continue;
+    if (p.osm_key === "highway" && p.type !== "street" && p.osm_value !== "bus_stop") continue;
     const street = [str(p.housenumber), str(p.street)].filter(Boolean).join(" ");
     const name = str(p.name) ?? street;
     if (!name) continue;

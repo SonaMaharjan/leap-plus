@@ -90,8 +90,9 @@ describe("trimPhoton", () => {
     const lamp = feature({ name: "LIFFEY STREET UPPER (C)", osm_key: "highway", type: "house", street: "Liffey Street Upper" });
     const road = feature({ name: "Liffey Street Upper", osm_key: "highway", type: "street", city: "Dublin", county: "Dublin 1" });
     const many = Array.from({ length: 8 }, (_, i) => feature({ name: `Tesco ${i}`, street: "Main Street", city: "Dublin" }));
-    const out = trimPhoton({ features: [heuston, heuston, lamp, road, feature({}), ...many] });
-    expect(out.map((p) => p.name)).toEqual(["Heuston", "Liffey Street Upper", "Tesco 0", "Tesco 1", "Tesco 2", "Tesco 3"]);
+    const stop = feature({ name: "UCD Belfield", osm_key: "highway", osm_value: "bus_stop", type: "house", street: "Stillorgan Road", county: "Dublin 4" });
+    const out = trimPhoton({ features: [heuston, heuston, lamp, road, stop, feature({}), ...many] });
+    expect(out.map((p) => p.name)).toEqual(["Heuston", "Liffey Street Upper", "UCD Belfield", "Tesco 0", "Tesco 1", "Tesco 2"]);
     expect(out[0].area).toBe("Saint John's Road West, Dublin 8");
     expect(out[1].area).toBe("Dublin 1");
     expect(trimPhoton(null)).toEqual([]);
