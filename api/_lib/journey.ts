@@ -80,10 +80,46 @@ export function trimGeocode(raw: any): Place[] {
       return { name: str(p.name) ?? "", area, lat: num(p.lat), lon: num(p.lon) };
     });
 }
+
+export const PHOTON = "https://photon.komoot.io/api/";
+// Ireland box for Photon (minLon,minLat,maxLon,maxLat); results rank near Dublin city centre first.
+export const PHOTON_PARAMS = `bbox=${BBOX.minLon},${BBOX.minLat},${BBOX.maxLon},${BBOX.maxLat}&lat=53.3498&lon=-6.2603&limit=10&lang=en`;
+
+const ADMIN_NOISE = /\bWard\b|\bD?ED\b|Electoral|Municipal District/;
+
+/** Photon GeoJSON → places with a street address, e.g. "14 Liffey Street Upper, Dublin 1". */
+export function trimPhoton(raw: any): Place[] {
+  const features: any[] = Array.isArray(raw?.features) ? raw.features : [];
+  const seen = new Set<string>();
+  const out: Place[] = [];
+  for (const f of features) {
+    const p = f?.properties ?? {};
+    const [lon, lat] = Array.isArray(f?.geometry?.coordinates) ? f.geometry.coordinates.map(Number) : [NaN, NaN];
+    if (!inIreland(lat, lon)) continue;
+    if (p.osm_key === "highway" && p.type !== "street") continue;
+    const street = [str(p.housenumber), str(p.street)].filter(Boolean).join(" ");
+    const name = str(p.name) ?? street;
+    if (!name) continue;
+    const county = str(p.county);
+    const postalDistrict = county && /^Dublin \d+W?$/.test(county) ? county : undefined;
+    const town = postalDistrict ?? [str(p.city), str(p.locality), str(p.district), county].find((t) => t && !ADMIN_NOISE.test(t));
+    const area = [street, town].filter((part, i, all) => part && part !== name && all.indexOf(part) === i).join(", ");
+    const key = `${name}|${area}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ name, area, lat, lon });
+    if (out.length === 6) break;
+  }
+  return out;
+}
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
 export async function transitous(path: string): Promise<unknown> {
-  const res = await fetch(`${TRANSITOUS}${path}`, {
+  return getJson(`${TRANSITOUS}${path}`);
+}
+
+export async function getJson(url: string): Promise<unknown> {
+  const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT, Accept: "application/json" },
     signal: AbortSignal.timeout(10_000),
   });
