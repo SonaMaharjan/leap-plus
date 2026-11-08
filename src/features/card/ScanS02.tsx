@@ -117,6 +117,7 @@ function TapIllustration({ state }: { state: "scanning" | "found" | "failed" }) 
 
 function ScanProgress({ state, progress }: { state: "scanning" | "found" | "failed"; progress: number }) {
   const pct = Math.round(progress);
+  const shown = state === "failed" ? 100 : pct;
   const label = state === "found" ? "Card read" : state === "failed" ? "Scan failed" : "Reading card…";
   return (
     <div className="mx-auto mt-5 w-full max-w-[260px] pb-1">
@@ -130,11 +131,12 @@ function ScanProgress({ state, progress }: { state: "scanning" | "found" | "fail
         aria-label="Card scan progress"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={pct}
+        aria-valuenow={shown}
+        aria-valuetext={state === "failed" ? label : `${label} ${pct}%`}
       >
         <div
           className={`h-full rounded-full transition-[width] duration-100 ease-linear ${state === "failed" ? "bg-red-500" : "bg-brand"}`}
-          style={{ width: `${state === "failed" ? 100 : pct}%` }}
+          style={{ width: `${shown}%` }}
         />
       </div>
     </div>
