@@ -76,7 +76,7 @@ export function trimGeocode(raw: any): Place[] {
     .slice(0, 6)
     .map((p) => {
       const areas: any[] = Array.isArray(p.areas) ? p.areas : [];
-      const area = areas.map((a) => str(a?.name)).filter((n) => n && n !== "Éire / Ireland" && !/\bWard\b|\bED$|Electoral/.test(n)).slice(-2).reverse().join(", ");
+      const area = areas.map((a) => str(a?.name)).filter((n) => n && n !== "Éire / Ireland" && !/\bWard\b|\bD?ED\b|Electoral/.test(n)).slice(-2).reverse().join(", ");
       return { name: str(p.name) ?? "", area, lat: num(p.lat), lon: num(p.lon) };
     });
 }

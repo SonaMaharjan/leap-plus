@@ -41,4 +41,22 @@ describe("trimGeocode", () => {
     ];
     expect(trimGeocode(raw)).toEqual([{ name: "Trinity College", area: "Dublin", lat: 53.344, lon: -6.258 }]);
   });
+
+  it("drops electoral-division names from the area label", () => {
+    const raw = [
+      {
+        name: "UCD",
+        lat: 53.305,
+        lon: -6.217,
+        areas: [
+          { name: "Éire / Ireland" },
+          { name: "County Dublin" },
+          { name: "Dún Laoghaire-Rathdown" },
+          { name: "Clonskeagh-Belfield DED 1986" },
+          { name: "Roebuck" },
+        ],
+      },
+    ];
+    expect(trimGeocode(raw)[0].area).toBe("Roebuck, Dún Laoghaire-Rathdown");
+  });
 });
