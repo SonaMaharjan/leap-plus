@@ -26,7 +26,7 @@ The current TFI Leap Top Up app has two gaps:
 One app that:
 
 - **Tops up a Leap card with a wallet in fewer taps:** Google Pay (TEST mode, real Google Pay sheet), simulated Apple Pay, or a saved card.
-- **Shows live buses:** routes E1, 39A and 16 on a map, with stop lists, next arrivals (Live vs Scheduled) and a fare-vs-balance check.
+- **Shows live buses:** any Dublin Bus or Go-Ahead Ireland route in Dublin on a map (users pick and save their own routes; E1, 39A and 16 by default), with stop lists, next arrivals (Live vs Scheduled) and a fare-vs-balance check.
 - **Joins the two together (smart top-up):** if your balance is below €4.00 (2 × €2.00 fare) while you're looking at a stop, the app offers a one-tap €10 Google Pay top-up without leaving the screen.
 - **Plans journeys:** A-to-B route comparison with a journey map and live buses (added after the original plan).
 
@@ -38,12 +38,12 @@ Leap+ deliberately keeps the look and feel of the existing Leap Top Up app: the 
 
 | Area | What it does |
 |---|---|
-| Card | Simulated NFC "hold your card" scan or manual card-number entry; card is saved on the device |
+| Card | Simulated NFC scan (Leap card tapping the back of a phone, with a progress bar) or manual card-number entry; card is saved on the device |
 | Home | Leap card visual, balance, low-balance banner (< €4), last transactions |
 | Top-up | Amount chips (€5 / €10 / €20 / €30) or custom (min €5, max balance €150); Google Pay TEST, Apple Pay (simulated), saved card •••• 4242; idempotent retries |
-| Live | Live bus map (LIVE from NTA GTFS-Realtime, automatic RECORDED fallback), stop list, stop detail with ETAs and fare |
+| Live | Live bus map for the user's saved routes (search and save up to 8 of 157 Dublin Bus and Go-Ahead routes; LIVE from NTA GTFS-Realtime, automatic RECORDED fallback for E1, 39A and 16), stop list, stop detail with ETAs and fare |
 | Smart top-up | One-tap €10 top-up from a stop when the balance is too low |
-| Plan | Place search, route options, journey map with live buses |
+| Plan | Place search (OpenStreetMap via Photon, with common short names like "UCD" or "Heuston"), route options, journey map with live buses |
 | Backend | Google Sheet + Google Apps Script acting as the "Leap backend" (fake cards, balances, transactions) |
 
 Demo flags for failure paths: `?scanFail=1`, `?topupFail=1`, `?liveFail=1`.
@@ -55,9 +55,10 @@ Full details: [docs/03-Tech-Spec.md](docs/03-Tech-Spec.md)
 ```
 Browser (React SPA)
   ├─ /api/card/get, /api/card/topup ──► Google Apps Script ──► Google Sheet (mock Leap backend)
-  ├─ /api/realtime?routes=E1,39A,16 ──► NTA GTFS-Realtime API (LIVE)
+  ├─ /api/realtime?routes=<saved routes> ──► NTA GTFS-Realtime API (LIVE)
   │     └─ fallback: /recorded/*.json (RECORDED snapshots)
-  ├─ /api/plan, /api/geocode ──► Transitous (journey planning, no key needed)
+  ├─ /api/geocode ──► Photon / OpenStreetMap (place search, Transitous as backup)
+  ├─ /api/plan ──► Transitous (journey planning, no key needed)
   ├─ /gtfs/{route}.json (static shapes, stops, timetable, pre-extracted)
   └─ Google Pay JS (TEST) · Apple Pay simulation (pure UI)
 ```
@@ -112,6 +113,8 @@ Supporting design docs: [Figma AI prompts](docs/02b-Figma-AI-Prompts.md), [flow 
 | Live data hardening: caching, rate-limit backoff, tile fix | Done (PRs #5–#7, #9, #10) |
 | Journey planner (beyond the original scope) | Done (PR #8) |
 | Moved to own accounts (GitHub, Vercel, Google Sheet, NTA key) | Done |
+| Scan screen redesign and OpenStreetMap place search with Dublin landmark names | Done |
+| Route choice: any Dublin Bus or Go-Ahead Ireland route in Dublin, saved per user | Done |
 | Code-freeze security check, full E2E checklist, demo rehearsal | **To do** |
 
 ## What needs to be done next
@@ -120,8 +123,9 @@ Supporting design docs: [Figma AI prompts](docs/02b-Figma-AI-Prompts.md), [flow 
 2. **Run the code-freeze security check** ([Security Review §7](docs/04-Security-Review.md)): no secrets in `dist/` or git, wrong Sheet secret returns `UNAUTHORIZED`, idempotency replay, `/api/realtime?routes=99X` returns 400, security headers present.
 3. **Use a dedicated demo Google account** for the Sheet/Apps Script owner and the Google Pay Chrome profile (Security Review F2, F4).
 4. **Update the docs to match what was built:** the Product Requirements Document (PRD) lists journey planning as a non-goal (NG3), but it now exists; account ownership (Tech Spec TQ3) has changed.
-5. **Tag the demo state** (`demo-p2`), reset the Sheet to seed values (`setup()`), record a backup video, and rehearse the 3-minute demo script ([Implementation Plan §7](docs/05-Implementation-Plan.md)).
-6. **Beyond the prototype:** see the production gaps in [Security Review §6](docs/04-Security-Review.md). They include user accounts, server-side payment via a PSP, real Apple Pay and an NTA partnership for real card data.
+5. **Keep route data fresh:** TFI updates its timetables regularly, so regenerate the route files from time to time (see Run locally). RECORDED demo data still only covers E1, 39A and 16.
+6. **Tag the demo state** (`demo-p2`), reset the Sheet to seed values (`setup()`), record a backup video, and rehearse the 3-minute demo script ([Implementation Plan §7](docs/05-Implementation-Plan.md)).
+7. **Beyond the prototype:** see the production gaps in [Security Review §6](docs/04-Security-Review.md). They include user accounts, server-side payment via a PSP, real Apple Pay and an NTA partnership for real card data.
 
 ## Run locally
 
@@ -142,6 +146,8 @@ SHEET_SHARED_SECRET=   # Apps Script → Project Settings → Script Properties 
 ```
 
 **Google Sheet backend setup:** create a Google Sheet, open Extensions → Apps Script, paste [apps-script/Code.gs](apps-script/Code.gs), and run `setup()` once. Then deploy as a Web app with Execute as: Me and Who has access: Anyone.
+
+**Refresh route data:** download `GTFS_Dublin_Bus.zip` and `GTFS_GoAhead.zip` from [TFI's GTFS page](https://www.transportforireland.ie/transitData/PT_Data.html), then run `python3 scripts/extract_gtfs.py --gtfs GTFS_Dublin_Bus.zip --gtfs GTFS_GoAhead.zip --date YYYYMMDD` with a weekday date. This rewrites `public/gtfs/` and `api/_lib/routeIds.ts`.
 
 **Deploy:** import the repo into Vercel and add the same three variables under Environment Variables (Production). Every push to `main` then deploys automatically.
 
