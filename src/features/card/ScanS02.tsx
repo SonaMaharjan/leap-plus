@@ -1,3 +1,4 @@
+import { CircleAlert, CircleCheck, Nfc } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { consumeDemoFlag, hasDemoFlag } from "../../lib/demoFlags";
@@ -40,16 +41,7 @@ export function ScanS02() {
   return (
     <Screen back="/welcome">
       <div className="flex flex-col items-center pt-8 text-center">
-        <div className="relative flex h-56 w-56 items-center justify-center">
-          {state === "scanning" && <span className="absolute inset-0 animate-ping rounded-full bg-brand/20" />}
-          <div
-            className={`relative flex h-40 w-40 items-center justify-center rounded-full text-6xl ${
-              state === "failed" ? "bg-red-50 text-red-600" : "bg-brand-light text-brand"
-            }`}
-          >
-            {state === "found" ? "✓" : state === "failed" ? "!" : "📶"}
-          </div>
-        </div>
+        <TapIllustration state={state} />
         {state === "scanning" && (
           <>
             <h1 className="mt-6 text-xl font-bold">Hold your Leap card to the back, top of your phone</h1>
@@ -68,5 +60,38 @@ export function ScanS02() {
         )}
       </div>
     </Screen>
+  );
+}
+
+/** A Leap card slides to the back, top of a phone. */
+function TapIllustration({ state }: { state: "scanning" | "found" | "failed" }) {
+  const failed = state === "failed";
+  return (
+    <div className="relative h-56 w-56" aria-hidden>
+      <div className={`absolute inset-4 rounded-full ${failed ? "bg-red-50" : "bg-brand-light"}`} />
+      {!failed && (
+        <div
+          className={`absolute left-1/2 top-3 z-0 flex h-[72px] w-32 flex-col justify-between rounded-xl bg-gradient-to-br from-brand to-brand-dark p-2.5 shadow-lg ${
+            state === "scanning" ? "motion-safe:animate-card-tap" : ""
+          }`}
+          style={{ transform: "translate(-50%, 0) rotate(-6deg)" }}
+        >
+          <span className="h-3 w-4 rounded-sm bg-white/70" />
+          <span className="self-end text-xs font-extrabold italic tracking-tight text-white">Leap+</span>
+        </div>
+      )}
+      <div className="absolute left-1/2 top-6 z-10 flex h-44 w-[100px] -translate-x-1/2 flex-col items-center rounded-[22px] border-[3px] border-ink bg-white shadow-xl">
+        <span className="mt-1.5 h-1.5 w-8 rounded-full bg-ink" />
+        <div className="flex flex-1 items-center justify-center">
+          {state === "found" ? (
+            <CircleCheck className="h-11 w-11 text-brand" strokeWidth={2.25} />
+          ) : failed ? (
+            <CircleAlert className="h-11 w-11 text-red-600" strokeWidth={2.25} />
+          ) : (
+            <Nfc className="h-10 w-10 text-brand motion-safe:animate-pulse" strokeWidth={2} />
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

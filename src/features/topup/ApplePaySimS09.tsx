@@ -1,3 +1,4 @@
+import { Check, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { formatCents } from "../../lib/money";
 
@@ -27,7 +28,7 @@ export function ApplePaySimS09({ amountCents, onPaid, onClose }: Props) {
           <span className="text-lg font-semibold"> Pay</span>
           <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Simulated</span>
           <button onClick={close} aria-label="Close" className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200 text-ink-muted">
-            ✕
+            <X className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </div>
         <dl className="mt-4 divide-y divide-neutral-200 rounded-2xl bg-white text-sm">
@@ -50,7 +51,9 @@ export function ApplePaySimS09({ amountCents, onPaid, onClose }: Props) {
           )}
           {stage === "done" && (
             <div className="flex flex-col items-center gap-2 text-sm font-semibold text-sky-600">
-              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-2xl text-white">✓</span>
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-sky-500 text-white">
+                <Check className="h-7 w-7" strokeWidth={3} />
+              </span>
               Done
             </div>
           )}
