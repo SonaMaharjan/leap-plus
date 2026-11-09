@@ -4,9 +4,9 @@
 
 **Live demo:** https://leap-plus.vercel.app
 
-**Demo video (3 min):** [watch the walkthrough](docs/media/leap-plus-demo.mp4)
+**Demo video (3 min):** [watch on YouTube](https://www.youtube.com/watch?v=kyKaEEQJvV4) (backup: [MP4 in this repo](docs/media/leap-plus-demo.mp4))
 
-[![Leap+ demo: card balance, live buses with fare check, and journey planning](docs/media/demo-poster.jpg)](docs/media/leap-plus-demo.mp4)
+[![Leap+ demo on YouTube: card balance, live buses with fare check, and journey planning](docs/media/demo-poster.jpg)](https://www.youtube.com/watch?v=kyKaEEQJvV4)
 
 Leap+ is a concept prototype of a Leap Card top-up app for Dublin commuters. It rebuilds the core top-up flow and adds wallet payments and live bus information, all in one app.
 
